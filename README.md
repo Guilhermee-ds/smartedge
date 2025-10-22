@@ -7,133 +7,134 @@ O **SmartEdge** é um balanceador de carga leve e eficiente desenvolvido em **Go
 ## 🧠 Visão Geral da Arquitetura
 
 ```
-                                   ┌──────────────────────┐
-                                   │   Cliente / Usuário  │
-                                   └──────────┬───────────┘
-                                              │
-                                              ▼
-                                    ┌──────────────────┐
-                                    │   SmartEdge LB   │  (porta :8080)
-                                    │  ─────────────── │
-                                    │  ✅ Health Check  │
-                                    │  🔄 /api/reload   │
-                                    │  ⚙️ Round-Robin   │
-                                    │  📊 /metrics      │
-                                    └────────┬─────────┘
-                                             │
-                        ┌────────────────────┴────────────────────┐
-                        │                                         │
-                        ▼                                         ▼
-                ┌────────────────────┐                 ┌────────────────────┐
-                │ Backend 1 (Python) │                 │ Backend 2 (Python) │
-                │ Porta: :8081       │                 │ Porta: :8082       │
-                │ /health            │                 │ /health            │
-                └────────────────────┘                 └────────────────────┘
+                               ┌──────────────────────┐
+                               │   Cliente / Usuário  │
+                               └──────────┬───────────┘
+                                          │
+                                          ▼
+                                ┌──────────────────┐
+                                │   SmartEdge LB   │  (porta :8080)
+                                │  ─────────────── │
+                                │  ✅ Health Check  │
+                                │  🔄 /api/reload   │
+                                │  ⚙️ Round-Robin   │
+                                │  📊 /metrics      │
+                                └────────┬─────────┘
+                                         │
+                    ┌────────────────────┴────────────────────┐
+                    │                                         │
+                    ▼                                         ▼
+            ┌────────────────────┐                 ┌────────────────────┐
+            │ Backend 1 (Python) │                 │ Backend 2 (Python) │
+            │ Porta: :8081       │                 │ Porta: :8082       │
+            │ /health            │                 │ /health            │
+            └────────────────────┘                 └────────────────────┘
 ```
 
+---
 
+## ⚙️ Componentes Principais
 
-⚙️ Componentes Principais
-
-1️⃣ Backend Manager ("backend/")
-
+### 1️⃣ Backend Manager (`backend/`)
 Gerencia a lista de backends ativos:
 
-- Verifica a saúde de cada instância ("/health")
+- Verifica a saúde de cada instância (`/health`)
 - Marca como “offline” backends indisponíveis
-- Suporta reload dinâmico via API ("/api/reload")
+- Suporta reload dinâmico via API (`/api/reload`)
 
 ---
 
-2️⃣ Balanceadores ("balancer/")
-
+### 2️⃣ Balanceadores (`balancer/`)
 Atualmente disponíveis:
 
-- Round-Robin: distribuição simples e uniforme.
-- EWMA: pondera os tempos de resposta dos backends e ajusta o tráfego dinamicamente.
+- **Round-Robin:** distribuição simples e uniforme  
+- **EWMA:** pondera os tempos de resposta e ajusta o tráfego dinamicamente
 
 ---
 
-3️⃣ Proxy ("proxy/")
-
+### 3️⃣ Proxy (`proxy/`)
 Camada reversa que recebe as requisições dos clientes e as redireciona para o backend ativo.
 
-- Implementa "httputil.ReverseProxy"
+- Implementa `httputil.ReverseProxy`
 - Mede tempo e sucesso das requisições
 - Reporta métricas via Prometheus
 
 ---
 
-4️⃣ Métricas ("metrics/")
-
-Expostas em "/metrics", prontas para integração com Prometheus e Grafana.
-
----
-
-5️⃣ Descoberta Automática
-
-Suporte a descoberta de backends via Consul (mockado, mas preparado para integração real).
+### 4️⃣ Métricas (`metrics/`)
+Expostas em `/metrics`, prontas para integração com Prometheus e Grafana.
 
 ---
 
-🚀 Como Executar o Projeto
-
-✅ Pré-requisitos
-
-- Go 1.21+
-- Python 3.10+
-- ab (ApacheBench) opcional, para testes de carga
+### 5️⃣ Descoberta Automática
+Suporte a descoberta de backends via **Consul** (mockado, mas preparado para integração real).
 
 ---
 
-🧩 Passo a Passo
+## 🚀 Como Executar o Projeto
 
-1. Clonar o repositório:
+### ✅ Pré-requisitos
+- Go **1.21+**
+- Python **3.10+**
+- `ab` (ApacheBench) opcional, para testes de carga
 
+---
+
+### 🧩 Passo a Passo
+
+#### 1️⃣ Clonar o repositório:
+```bash
 git clone https://github.com/guilhermee-ds/smartedge.git
 cd smartedge
+```
 
-2. Iniciar os backends simulados (Python):
-
+#### 2️⃣ Iniciar os backends simulados (Python):
+```bash
 python3 server1.py &
 python3 server2.py &
+```
 
-3. Executar o Load Balancer:
-
+#### 3️⃣ Executar o Load Balancer:
+```bash
 go run ./cmd/main.go
+```
 
-4. Testar o balanceamento:
-
+#### 4️⃣ Testar o balanceamento:
+```bash
 ab -n 100 -c 10 http://localhost:8080/
+```
 
-5. Ver métricas Prometheus:
-
-http://localhost:8080/metrics
+#### 5️⃣ Ver métricas Prometheus:
+Acesse: [http://localhost:8080/metrics](http://localhost:8080/metrics)
 
 ---
 
-🔄 APIs Principais
+## 🔄 APIs Principais
 
-Endpoint| Método| Descrição
-"/api/reload"| "POST"| Recarrega manualmente os backends
-"/metrics"| "GET"| Exibe métricas Prometheus
-"/"| "GET"| Endpoint balanceado (proxy reverso)
+| Endpoint | Método | Descrição |
+|-----------|---------|-----------|
+| `/api/reload` | POST | Recarrega manualmente os backends |
+| `/metrics` | GET | Exibe métricas Prometheus |
+| `/` | GET | Endpoint balanceado (proxy reverso) |
 
 ---
 
-🧪 Teste de Performance (exemplo)
-
+## 🧪 Teste de Performance (exemplo)
+```bash
 ab -n 100 -c 10 http://localhost:8080/
-
+```
 Saída esperada:
 
+```
 Requests per second:    ~14000 [#/sec]
 Failed requests:        0
+```
 
 ---
 
-🧱 Estrutura do Projeto
+## 🧱 Estrutura do Projeto
 
+```
 smartedge/
 ├── cmd/
 │   └── main.go                # Entry point
@@ -145,29 +146,32 @@ smartedge/
 ├── server1.py                 # Backend simulado 1
 ├── server2.py                 # Backend simulado 2
 └── README.md
+```
 
 ---
 
-📈 Exemplos de Log
+## 📈 Exemplos de Log
 
+```
 2025/10/21 23:25:39 🚀 SmartEdge iniciado na porta 8080
 2025/10/21 23:25:39 ✅ http://localhost:8081 OK
 2025/10/21 23:25:39 ✅ http://localhost:8082 OK
 2025/10/21 23:25:49 🔄 Backends atualizados via /api/reload
+```
 
 ---
 
-💡 Diferenciais Técnicos
+## 💡 Diferenciais Técnicos
 
-- 🔁 Reload dinâmico de backends sem reiniciar o servidor
-- ⚙️ Health Check automático com detecção de falhas
-- 🧠 EWMA adaptativo com priorização inteligente
-- 📊 Métricas Prometheus nativas
-- 🧩 Arquitetura modular e extensível
+- 🔁 Reload dinâmico de backends sem reiniciar o servidor  
+- ⚙️ Health Check automático com detecção de falhas  
+- 🧠 EWMA adaptativo com priorização inteligente  
+- 📊 Métricas Prometheus nativas  
+- 🧩 Arquitetura modular e extensível  
 
 ---
 
-🧑‍💻 Autor
+## 🧑‍💻 Autor
 
-Desenvolvido por Guilherme Oliveira
+Desenvolvido por **Guilherme Oliveira**  
 💼 Projeto técnico de demonstração — Engenharia de Software / Sistemas Distribuídos
