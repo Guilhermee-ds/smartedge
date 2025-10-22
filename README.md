@@ -90,7 +90,7 @@ Suporte a descoberta de backends via Consul (mockado, mas preparado para integra
 
 1. Clonar o repositório:
 
-git clone https://github.com/seuusuario/smartedge.git
+git clone https://github.com/guilhermee-ds/smartedge.git
 cd smartedge
 
 2. Iniciar os backends simulados (Python):
