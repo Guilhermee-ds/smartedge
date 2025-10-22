@@ -6,18 +6,31 @@ O **SmartEdge** é um balanceador de carga leve e eficiente desenvolvido em **Go
 
 ## 🧠 Visão Geral da Arquitetura
 
-```mermaid
-flowchart TD
-    A[Cliente / Usuário] -->|Requisições HTTP| B[SmartEdge Load Balancer]
-    B -->|Rota| C1[Backend 1 :8081]
-    B -->|Rota| C2[Backend 2 :8082]
-    B --> D[/api/reload]
-    B --> E[/health checks]
-    subgraph Backends
-        C1
-        C2
-    end
 ```
+                                   ┌──────────────────────┐
+                                   │   Cliente / Usuário  │
+                                   └──────────┬───────────┘
+                                              │
+                                              ▼
+                                    ┌──────────────────┐
+                                    │   SmartEdge LB   │  (porta :8080)
+                                    │  ─────────────── │
+                                    │  ✅ Health Check  │
+                                    │  🔄 /api/reload   │
+                                    │  ⚙️ Round-Robin   │
+                                    │  📊 /metrics      │
+                                    └────────┬─────────┘
+                                             │
+                        ┌────────────────────┴────────────────────┐
+                        │                                         │
+                        ▼                                         ▼
+                ┌────────────────────┐                 ┌────────────────────┐
+                │ Backend 1 (Python) │                 │ Backend 2 (Python) │
+                │ Porta: :8081       │                 │ Porta: :8082       │
+                │ /health            │                 │ /health            │
+                └────────────────────┘                 └────────────────────┘
+```
+
 
 O balanceador recebe requisições HTTP na porta `8080` e as distribui entre os backends ativos usando o algoritmo **Round-Robin**.  
 Cada backend é monitorado por requisições periódicas em `/health` para garantir alta disponibilidade.
