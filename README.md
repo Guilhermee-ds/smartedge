@@ -32,161 +32,142 @@ O **SmartEdge** é um balanceador de carga leve e eficiente desenvolvido em **Go
 ```
 
 
-O balanceador recebe requisições HTTP na porta `8080` e as distribui entre os backends ativos usando o algoritmo **Round-Robin**.  
-Cada backend é monitorado por requisições periódicas em `/health` para garantir alta disponibilidade.
+
+⚙️ Componentes Principais
+
+1️⃣ Backend Manager ("backend/")
+
+Gerencia a lista de backends ativos:
+
+- Verifica a saúde de cada instância ("/health")
+- Marca como “offline” backends indisponíveis
+- Suporta reload dinâmico via API ("/api/reload")
 
 ---
 
-## ⚙️ Fluxo de Funcionamento
+2️⃣ Balanceadores ("balancer/")
 
-1. **Inicialização**
-   - O SmartEdge inicia e carrega os backends configurados.
-   - Realiza checagem de saúde em cada servidor.
-   - Ativa somente os backends disponíveis.
+Atualmente disponíveis:
 
-2. **Distribuição de Requisições**
-   - Cada requisição recebida é enviada ao próximo backend ativo em ordem circular.
-   - Caso um backend falhe, é removido temporariamente da rotação.
-
-3. **Reload Dinâmico**
-   - Endpoint `/api/reload` permite atualizar a lista de backends **sem reiniciar o servidor Go**.
-   - Persistência garante que os backends ativos sejam mantidos entre reloads.
-
-4. **Monitoramento**
-   - Logs detalhados informam o estado dos backends e requisições.
-   - Mensagens como `✅ OK` ou `❌ Offline` indicam status em tempo real.
+- Round-Robin: distribuição simples e uniforme.
+- EWMA: pondera os tempos de resposta dos backends e ajusta o tráfego dinamicamente.
 
 ---
 
-## 🧩 Estrutura do Projeto
+3️⃣ Proxy ("proxy/")
 
-```
-smartedge/
-├── cmd/
-│   └── main.go          # Entrada principal da aplicação Go
-├── internal/
-│   ├── backend/         # Gerenciamento e descoberta de backends
-│   ├── balancer/        # Algoritmos de balanceamento (Round-Robin, EWMA)
-│   ├── proxy/           # Proxy reverso para rotear requisições
-│   └── metrics/         # Exposição de métricas Prometheus
-├── server1.py           # Backend de exemplo 1 (porta 8081)
-├── server2.py           # Backend de exemplo 2 (porta 8082)
-├── backends.json        # Persistência dos backends ativos (opcional)
-└── README.md
-```
+Camada reversa que recebe as requisições dos clientes e as redireciona para o backend ativo.
+
+- Implementa "httputil.ReverseProxy"
+- Mede tempo e sucesso das requisições
+- Reporta métricas via Prometheus
 
 ---
 
-## 🧪 Executando o Projeto
+4️⃣ Métricas ("metrics/")
 
-### 1. Clonar o repositório
-```bash
-git clone https://github.com/seu-usuario/smartedge.git
+Expostas em "/metrics", prontas para integração com Prometheus e Grafana.
+
+---
+
+5️⃣ Descoberta Automática
+
+Suporte a descoberta de backends via Consul (mockado, mas preparado para integração real).
+
+---
+
+🚀 Como Executar o Projeto
+
+✅ Pré-requisitos
+
+- Go 1.21+
+- Python 3.10+
+- ab (ApacheBench) opcional, para testes de carga
+
+---
+
+🧩 Passo a Passo
+
+1. Clonar o repositório:
+
+git clone https://github.com/seuusuario/smartedge.git
 cd smartedge
-```
 
-### 2. Iniciar os servidores backend
-Em terminais separados (ou em background):
-```bash
+2. Iniciar os backends simulados (Python):
+
 python3 server1.py &
 python3 server2.py &
-```
 
-Esses servidores de exemplo rodam nas portas `8081` e `8082` e respondem em `/health`.
+3. Executar o Load Balancer:
 
-### 3. Iniciar o SmartEdge
-```bash
 go run ./cmd/main.go
-```
+
+4. Testar o balanceamento:
+
+ab -n 100 -c 10 http://localhost:8080/
+
+5. Ver métricas Prometheus:
+
+http://localhost:8080/metrics
+
+---
+
+🔄 APIs Principais
+
+Endpoint| Método| Descrição
+"/api/reload"| "POST"| Recarrega manualmente os backends
+"/metrics"| "GET"| Exibe métricas Prometheus
+"/"| "GET"| Endpoint balanceado (proxy reverso)
+
+---
+
+🧪 Teste de Performance (exemplo)
+
+ab -n 100 -c 10 http://localhost:8080/
 
 Saída esperada:
-```
-🚀 SmartEdge iniciado na porta 8080
-🔄 Backends atualizados via /api/reload
-✅ http://localhost:8081 OK
-✅ http://localhost:8082 OK
-```
+
+Requests per second:    ~14000 [#/sec]
+Failed requests:        0
 
 ---
 
-## 🧠 Endpoints Principais
+🧱 Estrutura do Projeto
 
-| Método | Endpoint        | Descrição |
-|--------|-----------------|------------|
-| `GET`  | `/`             | Redireciona requisição para o backend ativo |
-| `GET`  | `/health`       | Health check interno do balanceador |
-| `POST` | `/api/reload`   | Atualiza lista de backends dinamicamente |
-| `GET`  | `/api/status`   | Retorna status dos backends e distribuição |
-
----
-
-## ⚡ Teste de Carga
-
-Use o **Apache Benchmark** para validar o balanceamento:
-
-```bash
-ab -n 100 -c 10 http://localhost:8080/
-```
-
-Exemplo de saída:
-```
-Concurrency Level:      10
-Time taken for tests:   1.245 seconds
-Complete requests:      100
-Requests per second:    80.32 [#/sec]
-```
-
-Durante o teste, o SmartEdge registra a distribuição das requisições entre os backends.
+smartedge/
+├── cmd/
+│   └── main.go                # Entry point
+├── internal/
+│   ├── backend/               # Gerenciamento de backends
+│   ├── balancer/              # Estratégias de balanceamento
+│   ├── metrics/               # Prometheus integration
+│   └── proxy/                 # Reverse proxy
+├── server1.py                 # Backend simulado 1
+├── server2.py                 # Backend simulado 2
+└── README.md
 
 ---
 
-## 💾 Persistência de Backends (opcional)
+📈 Exemplos de Log
 
-Para manter os backends mesmo após reiniciar o balanceador, basta salvar em `backends.json`:
-
-```json
-{
-  "backends": [
-    "http://localhost:8081",
-    "http://localhost:8082"
-  ]
-}
-```
-
-O SmartEdge lê esse arquivo na inicialização e restaura automaticamente as instâncias conhecidas.
+2025/10/21 23:25:39 🚀 SmartEdge iniciado na porta 8080
+2025/10/21 23:25:39 ✅ http://localhost:8081 OK
+2025/10/21 23:25:39 ✅ http://localhost:8082 OK
+2025/10/21 23:25:49 🔄 Backends atualizados via /api/reload
 
 ---
 
-## 🧱 Tecnologias Utilizadas
+💡 Diferenciais Técnicos
 
-| Tecnologia | Uso |
-|-------------|-----|
-| **Go** | Backend e balanceamento de carga |
-| **Python** | Servidores de teste simulando microserviços |
-| **net/http** | Servidor HTTP em Go |
-| **encoding/json** | Persistência e reload dinâmico |
-| **log** | Logging estruturado |
-| **Apache Benchmark (ab)** | Testes de carga |
+- 🔁 Reload dinâmico de backends sem reiniciar o servidor
+- ⚙️ Health Check automático com detecção de falhas
+- 🧠 EWMA adaptativo com priorização inteligente
+- 📊 Métricas Prometheus nativas
+- 🧩 Arquitetura modular e extensível
 
 ---
 
-## 🔍 Próximos Passos
+🧑‍💻 Autor
 
-- 🧱 Circuit Breaker → detectar falhas frequentes e desativar backends temporariamente  
-- 📊 Dashboard Grafana → visualizar métricas de latência e falhas  
-- 🔁 Hot Reload avançado → atualizar backends e estratégias sem reiniciar  
-- 🌍 GeoAffinity → priorizar servidores próximos geograficamente  
-- 💾 Descoberta automática via Consul / etcd
-
----
-
-## 👨‍💻 Autor
-
-**Guilherme Oliveira**  
-Desenvolvedor Backend • Foco em Go, Docker, Python e Arquitetura de Sistemas Distribuídos
-
----
-
-## 🏁 Licença
-
-Distribuído sob a licença MIT. Consulte o arquivo `LICENSE` para mais detalhes.
+Desenvolvido por Guilherme Oliveira
+💼 Projeto técnico de demonstração — Engenharia de Software / Sistemas Distribuídos
